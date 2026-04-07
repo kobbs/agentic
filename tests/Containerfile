@@ -1,0 +1,4 @@
+FROM fedora:43
+RUN dnf install -y bash grep coreutils
+WORKDIR /app
+COPY . .

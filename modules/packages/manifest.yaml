@@ -1,0 +1,9 @@
+name: packages
+description: Package management
+version: 1.0.0
+order: 20
+condition: always
+requires:
+  - system
+provides:
+  - packages

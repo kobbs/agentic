@@ -1,0 +1,9 @@
+name: sway
+description: Sway window manager config
+version: 1.0.0
+order: 40
+condition: sway
+requires:
+  - shell
+provides:
+  - sway-config

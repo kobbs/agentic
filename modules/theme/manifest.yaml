@@ -1,0 +1,9 @@
+name: theme
+description: Theming config
+version: 1.0.0
+order: 50
+condition: always
+requires:
+  - sway
+provides:
+  - theme-config

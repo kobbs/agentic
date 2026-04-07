@@ -1,0 +1,8 @@
+name: system
+description: System base configuration
+version: 1.0.0
+order: 10
+condition: always
+requires: []
+provides:
+  - system-base

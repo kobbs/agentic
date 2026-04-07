@@ -1,0 +1,9 @@
+name: shell
+description: Shell configuration
+version: 1.0.0
+order: 30
+condition: always
+requires:
+  - packages
+provides:
+  - shell

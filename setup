@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euo pipefail
+
+source core/common.sh
+source core/config.sh
+source core/colors.sh
+source core/manifest.sh
+source core/links.sh
+source core/templates.sh
+
+MODE="dry-run"
+if [[ "${1:-}" == "--apply" ]]; then
+    MODE="apply"
+fi
+
+# Load profiles
+load_profile "config.default.ini"
+load_profile "config.local.ini"
+
+# Load colors
+load_all_presets
+load_accent
+
+# Discover and sort modules
+discover_modules
+
+for mod in "${SORTED_MODULES[@]}"; do
+    cond="${MODULE_CONDITION[$mod]}"
+    if ! evaluate_condition "$cond"; then
+        continue
+    fi
+
+    export MODULE_DIR="$PWD/modules/$mod"
+    source "$MODULE_DIR/module.sh"
+
+    "${mod}::init"
+    if "${mod}::check"; then
+        if [[ "$MODE" == "apply" ]]; then
+            ok "Applying module: $mod"
+            "${mod}::apply"
+        else
+            ok "Preview module: $mod"
+            "${mod}::preview"
+        fi
+    else
+        ok "Module up to date: $mod"
+    fi
+done
+
+if [[ "$MODE" == "dry-run" ]]; then
+    ok "Dry run complete. Pass --apply to execute."
+fi
