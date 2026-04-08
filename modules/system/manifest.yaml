@@ -1,8 +1,13 @@
 name: system
-description: System base configuration
+description: Hostname, keyboard layout, GPU groups, firewall, bluetooth, tuned
 version: 1.0.0
 order: 10
 condition: always
-requires: []
+requires:
 provides:
-  - system-base
+  - hostname
+  - keyboard
+  - gpu-groups
+  - firewall
+  - bluetooth
+  - tuned

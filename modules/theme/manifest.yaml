@@ -1,9 +1,14 @@
 name: theme
-description: Theming config
+description: Accent colors, GTK/Qt/KDE theming, Tela icon theme, SDDM greeter
 version: 1.0.0
 order: 50
 condition: always
 requires:
+  - shell
   - sway
 provides:
-  - theme-config
+  - accent-colors
+  - gtk-theme
+  - qt-theme
+  - icon-theme
+  - sddm-theme

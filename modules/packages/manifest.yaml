@@ -1,9 +1,14 @@
 name: packages
-description: Package management
-version: 1.0.0
+description: System packages, repos, user apps, Flatpaks, DevOps tooling
+version: 2.0.0
 order: 20
 condition: always
 requires:
   - system
 provides:
-  - packages
+  - sway-packages
+  - cli-tools
+  - security-packages
+  - user-apps
+  - flatpak-apps
+  - devops-tools

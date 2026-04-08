@@ -1,0 +1,178 @@
+# sway config
+
+input * {
+   xkb_layout {{PROFILE_SYSTEM_KEYBOARD_LAYOUT}}
+}
+
+# Universal output fallback — kanshi handles per-machine profiles
+# Run: swaymsg -t get_outputs   (to discover connector names on a new machine)
+output * {
+    background #222222 solid_color
+    scale 1
+}
+
+exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
+exec eval $(gnome-keyring-daemon --start --components=secrets,ssh) && \
+    dbus-update-activation-environment --systemd SSH_AUTH_SOCK
+
+# -- dark theme (GTK + QT consistency)
+seat * xcursor_theme Adwaita 24
+exec_always {
+    gsettings set org.gnome.desktop.interface gtk-theme '{{PROFILE_THEME_GTK_THEME}}'
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+    gsettings set org.gnome.desktop.interface icon-theme '{{PROFILE_THEME_ICON_THEME}}'
+    gsettings set org.gnome.desktop.interface cursor-theme '{{PROFILE_THEME_CURSOR_THEME}}'
+    gsettings set org.gnome.desktop.interface font-name 'Sans 11'
+}
+
+exec kanshi
+exec /usr/libexec/polkit-mate-authentication-agent-1
+exec waybar
+exec dunst
+exec protonvpn-app
+
+exec swayidle -w \
+    timeout 300 'swaylock -f' \
+    timeout 600 'swaymsg "output * power off"' \
+    resume 'swaymsg "output * power on"' \
+    before-sleep 'swaylock -f'
+
+# -- mods
+set $mod Mod4
+set $mod2 Mod1
+floating_modifier $mod
+
+# -- workspaces
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+set $ws11 "11"
+set $ws12 "12"
+set $ws13 "13"
+set $ws14 "14"
+set $ws15 "15"
+set $ws16 "16"
+set $ws17 "17"
+set $ws18 "18"
+set $ws19 "19"
+set $ws20 "20"
+
+bindsym $mod+ampersand workspace 1
+bindsym $mod+eacute workspace 2
+bindsym $mod+quotedbl workspace 3
+bindsym $mod+apostrophe workspace 4
+bindsym $mod+parenleft workspace 5
+bindsym $mod+minus workspace 6
+bindsym $mod+egrave workspace 7
+bindsym $mod+underscore workspace 8
+bindsym $mod+ccedilla workspace 9
+bindsym $mod+agrave workspace 10
+bindsym $mod+$mod2+1 workspace $ws11
+bindsym $mod+$mod2+2 workspace $ws12
+bindsym $mod+$mod2+3 workspace $ws13
+bindsym $mod+$mod2+4 workspace $ws14
+bindsym $mod+$mod2+5 workspace $ws15
+bindsym $mod+$mod2+6 workspace $ws16
+bindsym $mod+$mod2+7 workspace $ws17
+bindsym $mod+$mod2+8 workspace $ws18
+bindsym $mod+$mod2+9 workspace $ws19
+bindsym $mod+$mod2+0 workspace $ws20
+
+# -- move to workspace
+bindsym $mod+Shift+ampersand move container to workspace 1
+bindsym $mod+Shift+eacute move container to workspace 2
+bindsym $mod+Shift+quotedbl move container to workspace 3
+bindsym $mod+Shift+apostrophe move container to workspace 4
+bindsym $mod+Shift+parenleft move container to workspace 5
+bindsym $mod+Shift+minus move container to workspace 6
+bindsym $mod+Shift+egrave move container to workspace 7
+bindsym $mod+Shift+underscore move container to workspace 8
+bindsym $mod+Shift+ccedilla move container to workspace 9
+bindsym $mod+Shift+agrave move container to workspace 10
+bindsym $mod+$mod2+Shift+1 move container to workspace 11
+bindsym $mod+$mod2+Shift+2 move container to workspace 12
+bindsym $mod+$mod2+Shift+3 move container to workspace 13
+bindsym $mod+$mod2+Shift+4 move container to workspace 14
+bindsym $mod+$mod2+Shift+5 move container to workspace 15
+bindsym $mod+$mod2+Shift+6 move container to workspace 16
+bindsym $mod+$mod2+Shift+7 move container to workspace 17
+bindsym $mod+$mod2+Shift+8 move container to workspace 18
+bindsym $mod+$mod2+Shift+9 move container to workspace 19
+bindsym $mod+$mod2+Shift+0 move container to workspace 20
+
+# Change container layout
+bindsym $mod+s layout stacking;exec notify-send 'Stacking mode'
+bindsym $mod+z layout tabbed;exec notify-send 'Tabbing mode'
+bindsym $mod+e layout toggle split;exec notify-send 'Splitting mode'
+
+# Change tilling direction
+bindsym $mod+h split h;exec notify-send 'Tile horizontally'
+bindsym $mod+v split v;exec notify-send 'Tile vertically'
+bindsym $mod+x layout toggle; exec notify-send 'Tile toggle'
+
+# Toggle sticky
+bindsym $mod+Shift+s sticky toggle;exec notify-send 'Toggle sticky container mode'
+
+# -- key bindings
+bindsym Control+$mod+Left workspace prev
+bindsym Control+$mod+Right workspace next
+bindsym $mod+Return exec kitty
+bindsym $mod+Shift+A kill
+bindsym $mod+d exec bemenu-run --fn "monospace 10" --nb "#1a1a1a" --nf "{{ACCENT_PRIMARY}}" --hb "{{ACCENT_PRIMARY}}" --hf "#1a1a1a" --fb "#1a1a1a" --ff "{{ACCENT_PRIMARY}}" --line-height 28 --width-factor 1.0 --margin 0 --no-overlap --monitor 0 --tf "{{ACCENT_PRIMARY}}"
+bindsym $mod+j focus left
+bindsym $mod+k focus down
+bindsym $mod+l focus up
+bindsym $mod+m focus right
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+bindsym $mod+Shift+j move left
+bindsym $mod+Shift+k move down
+bindsym $mod+Shift+l move up
+bindsym $mod+Shift+M move right
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+bindsym $mod+f fullscreen toggle
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+bindsym $mod+a focus parent
+bindsym $mod+q focus child
+
+bindsym $mod+r mode "resize"
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart
+bindsym $mod+Shift+e exec swaynag -t warning -m 'You pressed the exit shortcut. Do you really want to exit sway? This will end your Wayland session.' -B 'Yes, exit sway' 'swaymsg exit'
+
+# -- theme
+font pango:Droid Sans Fallback 12
+default_border pixel 1
+# colour of border, background, text, indicator, and child_border
+client.focused          {{ACCENT_PRIMARY}} #555754 #FFFFFF {{ACCENT_PRIMARY}} {{ACCENT_PRIMARY}}
+client.focused_inactive {{ACCENT_DIM}} #2E3537 #FFFFFF {{ACCENT_DIM}} {{ACCENT_DIM}}
+client.unfocused        {{ACCENT_DARK}} #2E3436 #FFFFFF {{ACCENT_DARK}} {{ACCENT_DARK}}
+client.urgent           #A40000 #2E3436 #FFFFFF #A40000 #A40000
+client.placeholder      {{ACCENT_BRIGHT}} #2E3436 #D8DEE8 #2E3436 #2E3436
+client.background       #2E3436
+
+# -- modes
+mode "resize" {
+        bindsym Left resize shrink width 10 px or 10 ppt
+        bindsym Up resize grow height 10 px or 10 ppt
+        bindsym Down resize shrink height 10 px or 10 ppt
+        bindsym Right resize grow width 10 px or 10 ppt
+        bindsym Return mode "default"
+        bindsym Escape mode "default"
+}
+
+# -- local overrides (per-machine customizations, not tracked by git)
+include ~/.config/sway/config.local

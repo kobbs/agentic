@@ -1,9 +1,14 @@
 name: sway
-description: Sway window manager config
+description: Sway compositor, Waybar status bar, Kanshi display profiles, Dunst notifications, Swaylock
 version: 1.0.0
 order: 40
 condition: sway
 requires:
+  - packages
   - shell
 provides:
-  - sway-config
+  - wayland-compositor
+  - status-bar
+  - notification-daemon
+  - display-profiles
+  - screen-locker

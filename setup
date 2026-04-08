@@ -1,52 +1,171 @@
 #!/bin/bash
+# shellcheck disable=SC1090
 set -euo pipefail
 
-source core/common.sh
-source core/config.sh
-source core/colors.sh
-source core/manifest.sh
-source core/links.sh
-source core/templates.sh
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+export REPO_ROOT
 
-MODE="dry-run"
-if [[ "${1:-}" == "--apply" ]]; then
-    MODE="apply"
-fi
+# Source core libraries
+source "$REPO_ROOT/core/common.sh"
+source "$REPO_ROOT/core/config.sh"
+source "$REPO_ROOT/core/colors.sh"
+source "$REPO_ROOT/core/links.sh"
+source "$REPO_ROOT/core/manifest.sh"
+source "$REPO_ROOT/core/templates.sh"
 
-# Load profiles
-load_profile "config.default.ini"
-load_profile "config.local.ini"
+# ---------------------------------------------------------------------------
+# usage
+# ---------------------------------------------------------------------------
+usage() {
+    cat <<'EOF'
+Usage: ./setup <command> [--apply] [options]
 
-# Load colors
+Commands:
+  install                Run all modules (dry-run by default)
+  system                 Hostname, keyboard, GPU groups, firewall
+  packages               System packages, repos, user apps, Flatpaks
+  shell                  Shell environment, terminal configs
+  sway                   Sway compositor stack
+  theme                  Accent colors, icon theme, SDDM
+
+Global options:
+  --apply                Execute changes (without this, only previews)
+EOF
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# run_module <name> [--apply] [args...]
+# Dispatches a single module by name.
+# ---------------------------------------------------------------------------
+run_module() {
+    local module_name="$1"
+    shift
+
+    local apply=false
+    local -a args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --apply) apply=true ;;
+            *) args+=("$1") ;;
+        esac
+        shift
+    done
+
+    if [[ -z "${_MODULE_DIRS[$module_name]+x}" ]]; then
+        echo "ERROR: Unknown module '${module_name}'" >&2
+        echo "Check modules/ for available modules." >&2
+        exit 1
+    fi
+
+    local module_dir="${_MODULE_DIRS[$module_name]}"
+    local prefix
+    prefix="$(_manifest_key_to_var "$module_name")"
+    local condition_var="${prefix}_CONDITION"
+    local condition="${!condition_var:-always}"
+
+    if ! evaluate_condition "$condition"; then
+        info "Skipping module '${module_name}' (condition '${condition}' not met)"
+        return 0
+    fi
+
+    validate_module_requires "$module_name"
+
+    export MODULE_DIR="$module_dir"
+    source "${module_dir}/module.sh"
+
+    "${module_name}::init" "${args[@]+"${args[@]}"}"
+
+    local needs_change=0
+    "${module_name}::check" "${args[@]+"${args[@]}"}" || needs_change=$?
+
+    if [[ $needs_change -eq 0 ]]; then
+        if [[ "$apply" == true ]]; then
+            "${module_name}::apply" "${args[@]+"${args[@]}"}"
+        else
+            "${module_name}::preview" "${args[@]+"${args[@]}"}"
+        fi
+    else
+        ok "Module '${module_name}' is already up to date"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# run_all_modules [--apply] [args...]
+# Runs all discovered modules in order.
+# ---------------------------------------------------------------------------
+run_all_modules() {
+    local apply=false
+    local -a args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --apply) apply=true ;;
+            *) args+=("$1") ;;
+        esac
+        shift
+    done
+
+    for module_name in "${_MODULE_NAMES[@]+"${_MODULE_NAMES[@]}"}"; do
+        local module_dir="${_MODULE_DIRS[$module_name]}"
+        local prefix
+        prefix="$(_manifest_key_to_var "$module_name")"
+        local condition_var="${prefix}_CONDITION"
+        local condition="${!condition_var:-always}"
+
+        if ! evaluate_condition "$condition"; then
+            info "Skipping module '${module_name}' (condition '${condition}' not met)"
+            continue
+        fi
+
+        validate_module_requires "$module_name"
+
+        export MODULE_DIR="$module_dir"
+        source "${module_dir}/module.sh"
+
+        "${module_name}::init" "${args[@]+"${args[@]}"}"
+
+        local needs_change=0
+        "${module_name}::check" "${args[@]+"${args[@]}"}" || needs_change=$?
+
+        if [[ $needs_change -eq 0 ]]; then
+            if [[ "$apply" == true ]]; then
+                "${module_name}::apply" "${args[@]+"${args[@]}"}"
+            else
+                "${module_name}::preview" "${args[@]+"${args[@]}"}"
+            fi
+        else
+            ok "Module '${module_name}' is already up to date"
+        fi
+    done
+
+    if [[ "$apply" == false ]]; then
+        echo ""
+        echo "Dry run complete. Pass --apply to execute all changes."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+# Load and validate profile
+load_profile "$REPO_ROOT"
+validate_profile
+
+# Load color presets and resolve accent
 load_all_presets
 load_accent
 
-# Discover and sort modules
-discover_modules
+# Discover modules
+discover_modules "$REPO_ROOT/modules"
 
-for mod in "${SORTED_MODULES[@]}"; do
-    cond="${MODULE_CONDITION[$mod]}"
-    if ! evaluate_condition "$cond"; then
-        continue
-    fi
+cmd="${1:-help}"
+shift || true
 
-    export MODULE_DIR="$PWD/modules/$mod"
-    source "$MODULE_DIR/module.sh"
-
-    "${mod}::init"
-    if "${mod}::check"; then
-        if [[ "$MODE" == "apply" ]]; then
-            ok "Applying module: $mod"
-            "${mod}::apply"
-        else
-            ok "Preview module: $mod"
-            "${mod}::preview"
-        fi
-    else
-        ok "Module up to date: $mod"
-    fi
-done
-
-if [[ "$MODE" == "dry-run" ]]; then
-    ok "Dry run complete. Pass --apply to execute."
-fi
+case "$cmd" in
+    install)    run_all_modules "$@" ;;
+    system|packages|shell|sway|theme)
+                run_module "$cmd" "$@" ;;
+    help|-h|--help) usage ;;
+    *)          echo "Unknown command: $cmd" >&2; usage ;;
+esac

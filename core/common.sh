@@ -1,51 +1,124 @@
-#!/bin/bash
+# shellcheck shell=bash
+# core/common.sh -- Core utility library, sourced by all modules.
+# Source this file; do not execute it directly.
+#
+# Color/accent functions live in core/colors.sh.
+# Symlink/deploy functions live in core/links.sh.
 
-ok() {
-    echo -e "\e[32m[OK]\e[0m $*"
+# ---------------------------------------------------------------------------
+# Logging helpers
+# ---------------------------------------------------------------------------
+
+# shellcheck disable=SC2034  # variables used by sourcing scripts
+
+info()  { echo -e "\n\033[1;34m→ $*\033[0m"; }
+ok()    { echo -e "\033[1;32m✓ $*\033[0m"; }
+warn()  { echo -e "\033[1;33m⚠ $*\033[0m"; }
+die()   { echo -e "\033[1;31m✗ $*\033[0m" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# preflight_checks
+# Ensures the script runs as a regular user on Fedora.
+# ---------------------------------------------------------------------------
+preflight_checks() {
+    if [[ $EUID -eq 0 ]]; then
+        echo "ERROR: Run as a regular user, not root. The script uses sudo internally." >&2
+        exit 1
+    fi
+    if ! grep -q '^ID=fedora$' /etc/os-release 2>/dev/null; then
+        echo "ERROR: This script targets Fedora. Detected OS is not Fedora." >&2
+        exit 1
+    fi
 }
 
-warn() {
-    echo -e "\e[33m[WARN]\e[0m $*"
+# ---------------------------------------------------------------------------
+# require_cmd <cmd> [<install-hint>]
+# Exits with a clear message if <cmd> is not on PATH.
+# ---------------------------------------------------------------------------
+require_cmd() {
+    local cmd="$1"
+    local hint="${2:-}"
+    if ! command -v "$cmd" &>/dev/null; then
+        echo "ERROR: Required command '${cmd}' not found.${hint:+ Install with: ${hint}}" >&2
+        exit 1
+    fi
 }
 
-err() {
-    echo -e "\e[31m[ERROR]\e[0m $*" >&2
+# ---------------------------------------------------------------------------
+# Package manifest paths -- used by pkg_install
+# ---------------------------------------------------------------------------
+PKG_MANIFEST="$HOME/.config/shell/.pkg-manifest"
+FLATPAK_MANIFEST="$HOME/.config/shell/.flatpak-manifest"
+
+# ---------------------------------------------------------------------------
+# pkg_install <pkg>...
+# Installs RPM packages via dnf and records them in the package manifest.
+# ---------------------------------------------------------------------------
+pkg_install() {
+    sudo dnf install -y "$@"
+    mkdir -p "$(dirname "$PKG_MANIFEST")"
+    local pkg
+    for pkg in "$@"; do
+        [[ "$pkg" == -* || "$pkg" == */* ]] && continue
+        grep -qFx "$pkg" "$PKG_MANIFEST" 2>/dev/null || echo "$pkg" >> "$PKG_MANIFEST"
+    done
 }
 
+# ---------------------------------------------------------------------------
+# detect_gpu
+# Sets _HAS_DISCRETE_AMD_GPU=true if a discrete AMD Navi/RDNA GPU is found.
+# ---------------------------------------------------------------------------
 detect_gpu() {
-    if command -v lspci >/dev/null 2>&1 && lspci | grep -qE "VGA.*AMD.*(Navi|RDNA)"; then
-        export _HAS_DISCRETE_AMD_GPU=true
-    else
-        export _HAS_DISCRETE_AMD_GPU=false
+    _HAS_DISCRETE_AMD_GPU=false
+    if lspci 2>/dev/null | grep -qi 'VGA.*AMD.*Navi\|VGA.*AMD.*RDNA'; then
+        _HAS_DISCRETE_AMD_GPU=true
     fi
 }
 
+# ---------------------------------------------------------------------------
+# detect_mode
+# Determines Sway Spin mode from PROFILE_SYSTEM_SWAY_SPIN (tri-state).
+# Sets SWAY_SPIN=true|false.
+#
+# When true/false: uses the profile value directly, mode file is ignored.
+# When auto: reads persisted cache, falls back to rpm -q sway detection,
+#            and persists the result for future auto runs.
+# ---------------------------------------------------------------------------
 detect_mode() {
-    local cache_file="$HOME/.config/shell/.bootstrap-mode"
-    if [[ "${PROFILE_SYSTEM_SWAY_SPIN:-auto}" == "true" ]]; then
-        export SWAY_SPIN=true
-    elif [[ "${PROFILE_SYSTEM_SWAY_SPIN:-auto}" == "false" ]]; then
-        export SWAY_SPIN=false
-    elif [[ -f "$cache_file" ]] && grep -qxE 'true|false' "$cache_file"; then
-        export SWAY_SPIN=$(cat "$cache_file")
-    elif rpm -q sway >/dev/null 2>&1; then
-        export SWAY_SPIN=true
-        mkdir -p "$(dirname "$cache_file")"
-        echo "true" > "$cache_file"
-    else
-        export SWAY_SPIN=false
-        mkdir -p "$(dirname "$cache_file")"
-        echo "false" > "$cache_file"
-    fi
+    local profile_val="${PROFILE_SYSTEM_SWAY_SPIN:-auto}"
+    local mode_file="$HOME/.config/shell/.bootstrap-mode"
+    SWAY_SPIN=false
+
+    case "$profile_val" in
+        true)  SWAY_SPIN=true ;;
+        false) SWAY_SPIN=false ;;
+        auto)
+            if [[ -f "$mode_file" ]] && grep -qxE 'true|false' "$mode_file"; then
+                SWAY_SPIN=$(cat "$mode_file")
+            elif rpm -q sway &>/dev/null; then
+                SWAY_SPIN=true
+            fi
+            # Persist for future auto runs
+            mkdir -p "$(dirname "$mode_file")"
+            echo "$SWAY_SPIN" > "$mode_file"
+            ;;
+    esac
 }
 
+# ---------------------------------------------------------------------------
+# find_fedora_version <url_template> [max_fallback]
+# Probes a URL pattern to find the newest Fedora version that exists.
+# Template uses {ver} as the version placeholder.
+# Echoes the first working version; returns 1 if none found.
+# ---------------------------------------------------------------------------
 find_fedora_version() {
-    local base_url="$1"
-    local current_ver=$(rpm -E %fedora 2>/dev/null || echo "43")
-    for ver in $(seq $current_ver -1 $((current_ver - 3))); do
-        local url="${base_url//\$releasever/$ver}"
-        if curl -s --head --connect-timeout 5 "$url" | head -n 1 | grep -q '200 OK\|302 Found'; then
-            echo "$ver"
+    local template="$1"
+    local max="${2:-3}"
+    local cur
+    cur=$(rpm -E %fedora)
+    for (( v=cur; v > cur - max; v-- )); do
+        if curl -sf --head --connect-timeout 5 "${template//\{ver\}/$v}" -o /dev/null; then
+            echo "$v"
             return 0
         fi
     done

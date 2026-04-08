@@ -1,9 +1,13 @@
 name: shell
-description: Shell configuration
-version: 1.0.0
+description: Shell environment, bash prompt, Fish shell, Kitty terminal, tmux
+version: 2.0.0
 order: 30
 condition: always
 requires:
   - packages
 provides:
-  - shell
+  - bootstrap-env
+  - qt-env-vars
+  - bash-config
+  - fish-config
+  - terminal-config
